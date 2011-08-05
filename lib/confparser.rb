@@ -22,9 +22,9 @@ class ConfParser < Hash
 
         def [] (name)
           __get__(name).tap {|x|
-            x.gsub!(/\$\((.+?)\)/) {|n|
+            break x.gsub(/\$\((.+?)\)/) {|n|
               (self[$1] || parent[$1]).to_s
-            } if x.is_a?(String)
+            }.strip if x.is_a?(String)
           }
         end
       }
@@ -69,28 +69,27 @@ class ConfParser < Hash
 
       case line
       when /^\s*[;#]/ then next
-      when /^\s*$/ then next
       when /^\s*(.+?)\s*[=:]\s*(.*)$/
         if section
           self[section] = Section.new(self) unless self[section]
-          key = $1
-          self[section][key] = $2
+          key, self[section][key] = $1, $2
         else
-          key = $1
-          self[key] = $2
+          key, self[key] = $1, $2
         end
       when /^\s*\[(.+?)\]\s*$/
-        section = $1
+        section, key = $1, nil
       else
         if key
           if section
             self[section] = Section.new(self) unless self[section]
+            self[section][key] = '' unless self[section][key]
             self[section][key] += "\n" + line
           else
+            self[key] = '' unless self[key]
             self[key] += "\n" + line
           end
         else
-          raise "Syntax error at line #{lineno}"
+          raise "Syntax error at line #{lineno}" unless line =~ /^\s*$/
         end
       end
     }
