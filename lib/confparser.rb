@@ -62,6 +62,7 @@ class ConfParser < Hash
 
       case line
       when /^\s*[;#]/ then next
+      when /^\s*$/ then next
       when /^\s*(.+?)\s*[=:]\s*(.*)$/
         if section
           self[section] = Section.new(self) unless self[section]
