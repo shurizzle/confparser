@@ -13,26 +13,31 @@
 autoload :StringIO, 'stringio'
 
 class ConfParser < Hash
+  module Template
+    def self.included (obj)
+      obj.class_eval {
+        attr_reader :parent
+        alias __get__ []
+        private :__get__
+
+        def [] (name)
+          __get__(name).tap {|x|
+            x.gsub!(/\$\((.+?)\)/) {|n|
+              (self[$1] || parent[$1]).to_s
+            } if x.is_a?(String)
+          }
+        end
+      }
+    end
+  end
+
   class Section < Hash
-    attr_reader :parent
+    include Template
 
     def initialize (parent)
       super()
       @parent = parent
     end
-
-    alias __get__ []
-    def [] (name)
-      __get__(name).tap {|x|
-        if x.is_a?(String)
-          x.gsub!(/\$\((.+?)\)/) {|n|
-            (self[$1] || parent[$1]).to_s
-          }
-        end
-      }
-    end
-
-    private :__get__
   end
 
   class << self
@@ -54,8 +59,10 @@ class ConfParser < Hash
     end
   end
 
+  include Template
+
   def initialize (io)
-    section, key, lineno = nil, nil, 0
+    @parent, section, key, lineno = {}, nil, nil, 0
 
     io.each_line {|line|
       lineno += 1
@@ -89,17 +96,4 @@ class ConfParser < Hash
     }
     io.close
   end
-
-  alias __get__ []
-  def [] (name)
-    __get__(name).tap {|x|
-      if x.is_a?(String)
-        x.gsub!(/\$\((.+?)\)/) {|n|
-          (self[$1]).to_s
-        }
-      end
-    }
-  end
-
-    private :__get__
 end
