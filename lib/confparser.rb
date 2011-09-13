@@ -18,7 +18,8 @@ class ConfParser < Hash
       obj.class_eval {
         attr_reader :parent
         alias __get__ []
-        private :__get__
+        alias __set__ []=
+        private :__get__, :__set__
 
         def [] (name)
           __get__(name).tap {|x|
@@ -27,16 +28,39 @@ class ConfParser < Hash
             }.strip if x.is_a?(String)
           }
         end
+
+        def to_s
+          map {|key, value|
+            value.is_a?(Hash) ? "[#{key}]\n#{value.to_s.gsub(/^/, '  ')}" : "#{key} = #{value.to_s}"
+          }.join("\n")
+        end
       }
     end
   end
 
   class Section < Hash
+    class << self
+      def from_hash (parent, hash)
+        raise ArgumentError unless hash.is_a?(Hash)
+        return hash if hash.is_a?(self)
+        self.new(parent).tap {|sec|
+          hash.each {|key, value|
+            sec[key] = value
+          }
+        }
+      end
+    end
+
     include Template
 
     def initialize (parent)
       super()
       @parent = parent
+    end
+
+    def []= (key, value)
+      raise ArgumentError unless key.is_a?(String) and value.is_a?(String)
+      __set__(key.to_s, value.to_s)
     end
   end
 
@@ -71,7 +95,7 @@ class ConfParser < Hash
       when /^\s*[;#]/ then next
       when /^\s*(.+?)\s*[=:]\s*(.*)$/
         if section
-          self[section] = Section.new(self) unless self[section]
+          __set__(section, Section.new(self)) unless self[section]
           key, self[section][key] = $1, $2
         else
           key, self[key] = $1, $2
@@ -81,11 +105,11 @@ class ConfParser < Hash
       else
         if key
           if section
-            self[section] = Section.new(self) unless self[section]
+            __set__(section, Section.new(self)) unless self[section]
             self[section][key] = '' unless self[section][key]
             self[section][key] += "\n" + line
           else
-            self[key] = '' unless self[key]
+            __set__(key, '') unless self[key]
             self[key] += "\n" + line
           end
         else
@@ -94,5 +118,16 @@ class ConfParser < Hash
       end
     }
     io.close
+  end
+
+  def []= (key, value)
+    raise ArgumentError unless key.is_a?(String) and (value.is_a?(String) or value.is_a?(Hash))
+    __set__(key.to_s, (value.is_a?(String) ? value.to_s : Section.from_hash(self, value)))
+  end
+
+  def save (path)
+    File.open(path, 'w') {|f|
+      f.write(self.to_s)
+    }
   end
 end
