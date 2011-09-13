@@ -29,9 +29,9 @@ class ConfParser < Hash
           }
         end
 
-        def to_s
+        def to_s (separator = ' = ')
           map {|key, value|
-            value.is_a?(Hash) ? "[#{key}]\n#{value.to_s.gsub(/^/, '  ')}" : "#{key} = #{value.to_s}"
+            value.is_a?(Hash) ? "[#{key}]\n#{value.to_s(separator).gsub(/^/, '  ')}" : "#{key}#{separator}#{value.to_s}"
           }.join("\n")
         end
       }
